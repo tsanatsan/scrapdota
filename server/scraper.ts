@@ -17,6 +17,7 @@ class ForumScraper {
   private page: Page | null = null;
   private forumUrl = 'https://dota2.ru/forum/forums/obmen-vnutriigrovymi-predmetami-dota-2.86/';
   private scrapedTopics = new Set<string>();
+  private shouldStop = false; // Флаг для остановки парсинга
   
   async initialize() {
     console.log('🚀 Инициализация браузера...');
@@ -28,18 +29,19 @@ class ForumScraper {
     console.log('✅ Браузер готов\n');
   }
   
-  async scrapeTopics(keywords: string[]): Promise<TopicData[]> {
+  async scrapeTopics(keywords: string[], fullScan = false): Promise<TopicData[]> {
     if (!this.page) throw new Error('Браузер не инициализирован');
     
+    this.shouldStop = false; // Сбрасываем флаг при старте
     const allTopics: TopicData[] = [];
     let currentPage = 1;
-    const MAX_PAGES = 50; // Парсим первые 50 страниц за раз
+    const MAX_PAGES = fullScan ? 3590 : 5; // Полное сканирование или только первые 5 страниц
     
-    console.log(`📚 Парсинг страниц форума (макс ${MAX_PAGES} страниц)...`);
+    console.log(`📚 Режим: ${fullScan ? 'ПОЛНОЕ СКАНИРОВАНИЕ (все 3590 страниц)' : 'БЫСТРАЯ ПРОВЕРКА (первые 5 страниц)'}`);
     console.log(`🔑 Ключевые слова: ${keywords.join(', ')}\n`);
     
     // Проходим по страницам пагинации
-    while (currentPage <= MAX_PAGES) {
+    while (currentPage <= MAX_PAGES && !this.shouldStop) {
       const pageUrl = currentPage === 1 
         ? this.forumUrl 
         : `${this.forumUrl}page-${currentPage}`;
@@ -118,6 +120,12 @@ class ForumScraper {
           break;
         }
         
+        // Проверяем, не остановлен ли парсинг
+        if (this.shouldStop) {
+          console.log('⏸️ Парсинг остановлен\n');
+          break;
+        }
+        
         currentPage++;
         
       } catch (error: any) {
@@ -127,6 +135,83 @@ class ForumScraper {
     }
     
     console.log(`\n✅ Всего найдено топиков с совпадениями: ${allTopics.length}\n`);
+    return allTopics;
+  }
+  
+  // Получить все топики со страницы (без фильтрации)
+  async getAllTopicsFromPages(maxPages: number): Promise<Array<{topicId: string, title: string, url: string}>> {
+    if (!this.page) throw new Error('Браузер не инициализирован');
+    
+    this.shouldStop = false;
+    const allTopics: Array<{topicId: string, title: string, url: string}> = [];
+    let currentPage = 1;
+    
+    console.log(`📚 Сбор всех топиков (макс ${maxPages} страниц)...\n`);
+    
+    while (currentPage <= maxPages && !this.shouldStop) {
+      const pageUrl = currentPage === 1 
+        ? this.forumUrl 
+        : `${this.forumUrl}page-${currentPage}`;
+      
+      if (currentPage % 50 === 0) {
+        console.log(`📄 Прогресс: ${currentPage}/${maxPages} страниц...`);
+      }
+      
+      try {
+        await this.page.goto(pageUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
+        await this.page.waitForTimeout(1000);
+        
+        const pageTopics = await this.page.evaluate(() => {
+          const links = Array.from(document.querySelectorAll('a[href*="/threads/"]'));
+          const seen = new Set<string>();
+          const results: Array<{topicId: string, title: string, url: string}> = [];
+          
+          links.forEach(link => {
+            const href = (link as HTMLAnchorElement).href;
+            const title = link.textContent?.trim() || '';
+            
+            if (!title || !href || seen.has(href) || href.includes('/members/')) {
+              return;
+            }
+            
+            seen.add(href);
+            
+            // Извлекаем ID из URL
+            const match = href.match(/\/threads\/([^/]+)/);
+            const topicId = match ? match[1] : href;
+            
+            results.push({ topicId, title, url: href });
+          });
+          
+          return results;
+        });
+        
+        allTopics.push(...pageTopics);
+        
+        const hasNextPage = await this.page.evaluate(() => {
+          const links = Array.from(document.querySelectorAll('[class*="pagination"] a'));
+          return links.some(link => link.textContent?.trim().toLowerCase() === 'вперёд');
+        });
+        
+        if (!hasNextPage) {
+          console.log(`🏁 Достигнута последняя страница (${currentPage})\n`);
+          break;
+        }
+        
+        if (this.shouldStop) {
+          console.log('⏸️ Сбор остановлен\n');
+          break;
+        }
+        
+        currentPage++;
+        
+      } catch (error: any) {
+        console.error(`❌ Ошибка на странице ${currentPage}: ${error.message}`);
+        break;
+      }
+    }
+    
+    console.log(`✅ Собрано топиков: ${allTopics.length}\n`);
     return allTopics;
   }
   
@@ -192,6 +277,11 @@ class ForumScraper {
       await this.browser.close();
       console.log('🔚 Браузер закрыт');
     }
+  }
+  
+  stop() {
+    this.shouldStop = true;
+    console.log('🛑 Запрос на остановку парсинга...');
   }
 }
 

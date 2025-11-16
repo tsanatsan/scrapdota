@@ -4,6 +4,7 @@ import { WebSocketServer, WebSocket } from 'ws';
 import cors from 'cors';
 import { ForumScraper, TopicData } from './scraper';
 import type { Post, Keyword, Forum } from './types';
+import { db } from './database';
 
 const app = express();
 app.use(cors());
@@ -95,7 +96,7 @@ const scrapeForums = async () => {
     }
     
   } else {
-    // Реальный парсинг
+    // Реальный парсинг с БД
     console.log('🔍 Запуск реального парсинга...');
     
     try {
@@ -104,25 +105,77 @@ const scrapeForums = async () => {
         await scraper.initialize();
       }
       
-      const keywordTexts = keywords.map(k => k.text);
-      const topics = await scraper.scrapeTopics(keywordTexts);
+      // Проверяем, завершено ли первичное сканирование
+      const isInitialComplete = await db.isInitialScanComplete();
       
-      topics.forEach(topic => {
-        const newPost: Post = {
-          id: topic.id,
-          title: topic.title,
-          url: topic.url,
-          sourceForum: 'dota2.ru',
-          matchedKeyword: topic.matchedKeywords[0] || '',
-          timestamp: topic.timestamp,
-          author: topic.author,
-        };
+      if (!isInitialComplete) {
+        // ПЕРВИЧНОЕ СКАНИРОВАНИЕ: собираем все топики
+        console.log('🚨 ПЕРВИЧНОЕ СКАНИРОВАНИЕ: собираем все 3590 страниц...');
+        const allTopics = await scraper.getAllTopicsFromPages(3590);
         
-        posts.unshift(newPost);
-        broadcast({ type: 'NEW_POST', payload: newPost });
-      });
+        // Сохраняем в БД порциями
+        const BATCH_SIZE = 500;
+        for (let i = 0; i < allTopics.length; i += BATCH_SIZE) {
+          const batch = allTopics.slice(i, i + BATCH_SIZE);
+          const saved = await db.saveTopics(batch);
+          console.log(`💾 Сохранено в БД: ${i + saved}/${allTopics.length}`);
+        }
+        
+        console.log(`✅ Первичное сканирование завершено!\n`);
+      }
       
-      console.log(`✅ Найдено: ${topics.length} топиков`);
+      // БЫСТРАЯ ПРОВЕРКА: проверяем первые 5 страниц на новые топики
+      console.log('⚡ Быстрая проверка новых топиков...');
+      const recentTopics = await scraper.getAllTopicsFromPages(5);
+      
+      // Проверяем, какие из них новые
+      const topicIds = recentTopics.map(t => t.topicId);
+      const newTopicIds = await db.getNewTopics(topicIds);
+      
+      if (newTopicIds.length > 0) {
+        console.log(`🆕 Найдено новых топиков: ${newTopicIds.length}`);
+        
+        const newTopics = recentTopics.filter(t => newTopicIds.includes(t.topicId));
+        
+        // Сохраняем новые топики
+        await db.saveTopics(newTopics);
+        
+        // Проверяем на ключевые слова
+        const keywordTexts = keywords.map(k => k.text);
+        
+        for (const topic of newTopics) {
+          const titleLower = topic.title.toLowerCase();
+          const matchedKeywords = keywordTexts.filter(kw => titleLower.includes(kw.toLowerCase()));
+          
+          if (matchedKeywords.length > 0) {
+            // Сохраняем совпадение в БД
+            for (const keyword of matchedKeywords) {
+              await db.saveMatch(topic.topicId, topic.title, topic.url, keyword);
+            }
+            
+            // Отправляем клиентам
+            const newPost: Post = {
+              id: topic.topicId,
+              title: topic.title,
+              url: topic.url,
+              sourceForum: 'dota2.ru',
+              matchedKeyword: matchedKeywords[0],
+              timestamp: new Date(),
+              author: 'Неизвестно',
+            };
+            
+            posts.unshift(newPost);
+            broadcast({ type: 'NEW_POST', payload: newPost });
+            
+            console.log(`  ✅ "${topic.title.substring(0, 60)}..." → [${matchedKeywords.join(', ')}]`);
+          }
+        }
+      } else {
+        console.log('👍 Новых топиков нет');
+      }
+      
+      const dbCount = await db.getTopicsCount();
+      console.log(`📊 Всего в БД: ${dbCount} топиков\n`);
       
     } catch (error) {
       console.error('❌ Ошибка парсинга:', error);
@@ -143,6 +196,10 @@ const stopScraping = () => {
     console.log('⏸️ Остановка скрапера...');
     clearInterval(scrapingInterval);
     scrapingInterval = null;
+  }
+  // Останавливаем текущий парсинг, если он идёт
+  if (scraper) {
+    scraper.stop();
   }
 };
 
@@ -220,10 +277,19 @@ wss.on('connection', ws => {
 });
 
 // --- Start Server ---
-server.listen(PORT, () => {
+server.listen(PORT, async () => {
   console.log(`🚀 Сервер запущен на http://localhost:${PORT}`);
   console.log(`🎭 Режим: ${USE_MOCK_DATA ? 'Mock-данные' : 'Реальный парсинг'}`);
   console.log(`⏱️  Интервал: ${SCRAPE_INTERVAL / 1000 / 60} мин\n`);
+  
+  // Инициализируем БД
+  if (!USE_MOCK_DATA) {
+    const dbInitialized = await db.initialize();
+    if (dbInitialized) {
+      const count = await db.getTopicsCount();
+      console.log(`💾 БД: ${count} топиков в базе\n`);
+    }
+  }
   
   startScraping();
 });
