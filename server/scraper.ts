@@ -15,13 +15,13 @@ interface TopicData {
 class ForumScraper {
   private browser: Browser | null = null;
   private page: Page | null = null;
-  private forumUrl = 'https://dota2.ru/forum/forums/obmen-predmetami-dota-2.910/';
+  private forumUrl = 'https://dota2.ru/forum/forums/obmen-vnutriigrovymi-predmetami-dota-2.86/';
   private scrapedTopics = new Set<string>();
   
   async initialize() {
     console.log('🚀 Инициализация браузера...');
     this.browser = await chromium.launch({
-      headless: true,
+      headless: false, // Отключаем headless для отладки
       args: ['--no-sandbox']
     });
     this.page = await this.browser.newPage();
@@ -39,75 +39,68 @@ class ForumScraper {
     
     console.log('🔍 Поиск топиков...');
     
-    // Сначала собираем информацию о всех топиках на странице
-    const topicListData = await this.page.evaluate(() => {
-      const blocks = document.querySelectorAll('.forum__block-topic-title');
-      const result: Array<{title: string, index: number}> = [];
+    // Собираем информацию о топиках (ссылки на threads)
+    const topicLinks = await this.page.evaluate(() => {
+      const links = Array.from(document.querySelectorAll('a[href*="/threads/"]'));
+      const seen = new Set<string>();
+      const result: Array<{title: string, url: string}> = [];
       
-      blocks.forEach((block, index) => {
-        const title = block.textContent?.trim() || '';
-        if (title) {
-          result.push({ title, index });
+      links.forEach(link => {
+        const href = (link as HTMLAnchorElement).href;
+        const title = link.textContent?.trim() || '';
+        
+        // Игнорируем пустые и дубликаты
+        if (title && href && !seen.has(href) && !href.includes('/members/')) {
+          seen.add(href);
+          result.push({ title, url: href });
         }
       });
       
       return result;
     });
     
-    console.log(`📊 Найдено топиков: ${topicListData.length}\n`);
+    console.log(`📊 Найдено топиков: ${topicLinks.length}\n`);
     
     const topics: TopicData[] = [];
     
-    // Теперь переходим по каждому топику
-    for (const {title, index} of topicListData) {
+    // Переходим по каждому топику
+    for (const {title, url} of topicLinks) {
       try {
-        // Перезагружаем страницу форума перед каждым кликом
-        await this.page.goto(this.forumUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
+        // Пропускаем уже обработанные
+        if (this.scrapedTopics.has(url)) continue;
+        
+        console.log(`📌 Парсинг: "${title.substring(0, 50)}..."`);
+        
+        await this.page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
         await this.page.waitForTimeout(2000);
         
-        // Находим нужный блок и кликаем
-        const blocks = await this.page.$$('.forum__block-topic-title');
-        if (index >= blocks.length) continue;
+        // Парсим содержимое топика
+        const content = await this.parseTopicContent();
+        const author = await this.parseAuthor();
+        const steamId = this.extractSteamId(content);
         
-        const parent = await blocks[index].evaluateHandle(el => el.parentElement);
+        // Проверяем совпадения с ключевыми словами
+        const matchedKeywords = this.findMatches(title, content, keywords);
         
-        console.log(`📌 Парсинг ${index + 1}/${topicListData.length}: "${title.substring(0, 50)}..."`);
+        const topic: TopicData = {
+          id: Date.now().toString() + Math.random().toString(36).substring(2, 9),
+          title: title.trim(),
+          url,
+          author,
+          content: content.substring(0, 500), // Ограничиваем размер
+          steamId,
+          timestamp: new Date(),
+          hasMatch: matchedKeywords.length > 0,
+          matchedKeywords
+        };
         
-        const currentUrl = this.page.url();
-        await parent.asElement()?.click();
-        await this.page.waitForTimeout(3000); // Ждём загрузки
+        topics.push(topic);
+        this.scrapedTopics.add(url);
         
-        const topicUrl = this.page.url();
-        
-        if (topicUrl !== currentUrl && !this.scrapedTopics.has(topicUrl)) {
-          // Парсим содержимое топика
-          const content = await this.parseTopicContent();
-          const author = await this.parseAuthor();
-          const steamId = this.extractSteamId(content);
-          
-          // Проверяем совпадения с ключевыми словами
-          const matchedKeywords = this.findMatches(title, content, keywords);
-          
-          const topic: TopicData = {
-            id: Date.now().toString() + Math.random().toString(36).substring(2, 9),
-            title: title.trim(),
-            url: topicUrl,
-            author,
-            content: content.substring(0, 500), // Ограничиваем размер
-            steamId,
-            timestamp: new Date(),
-            hasMatch: matchedKeywords.length > 0,
-            matchedKeywords
-          };
-          
-          topics.push(topic);
-          this.scrapedTopics.add(topicUrl);
-          
-          if (matchedKeywords.length > 0) {
-            console.log(`  ✅ Совпадения: ${matchedKeywords.join(', ')}`);
-          } else {
-            console.log(`  📄 Без совпадений`);
-          }
+        if (matchedKeywords.length > 0) {
+          console.log(`  ✅ Совпадения: ${matchedKeywords.join(', ')}`);
+        } else {
+          console.log(`  📄 Без совпадений`);
         }
         
       } catch (error: any) {

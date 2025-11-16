@@ -11,7 +11,7 @@ const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
 
 const PORT = 8080;
-const USE_MOCK_DATA = true; // Пока используем мок-данные
+const USE_MOCK_DATA = false; // Переключатель: true - мок-данные, false - реальный парсинг
 const SCRAPE_INTERVAL = 5 * 60 * 1000; // 5 минут
 
 // --- State Management ---
@@ -24,7 +24,7 @@ let keywords: Keyword[] = [
 ];
 
 let forums: Forum[] = [
-  { id: '1', url: 'https://dota2.ru/forum/forums/obmen-predmetami-dota-2.910/' },
+  { id: '1', url: 'https://dota2.ru/forum/forums/obmen-vnutriigrovymi-predmetami-dota-2.86/' },
 ];
 
 let isRunning: boolean = true;
