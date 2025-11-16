@@ -107,10 +107,10 @@ class ForumScraper {
         
         console.log(`  → Найдено совпадений: ${pageTopics.length}\n`);
         
-        // Проверяем, есть ли кнопка "Далее" для следующей страницы
+        // Проверяем, есть ли кнопка "вперёд" для следующей страницы
         const hasNextPage = await this.page.evaluate(() => {
-          const nextButton = document.querySelector('.pageNav-jump--next');
-          return nextButton !== null;
+          const links = Array.from(document.querySelectorAll('[class*="pagination"] a'));
+          return links.some(link => link.textContent?.trim().toLowerCase() === 'вперёд');
         });
         
         if (!hasNextPage) {
