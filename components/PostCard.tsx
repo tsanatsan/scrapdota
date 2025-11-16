@@ -1,9 +1,11 @@
 
 import React from 'react';
 import type { Post } from '../types';
+import { TrashIcon } from './icons/TrashIcon';
 
 interface PostCardProps {
   post: Post;
+  onDelete?: (id: string) => void;
 }
 
 const getPlural = (number: number, one: string, two: string, five: string): string => {
@@ -59,16 +61,27 @@ const timeAgo = (date: Date): string => {
 }
 
 
-export const PostCard: React.FC<PostCardProps> = ({ post }) => {
+export const PostCard: React.FC<PostCardProps> = ({ post, onDelete }) => {
   return (
     <div className="bg-gray-900/50 rounded-lg p-4 border border-gray-700 hover:border-cyan-500 transition-colors duration-300 transform hover:scale-[1.01]">
-      <div className="flex justify-between items-start">
-        <a href={post.url} target="_blank" rel="noopener noreferrer" className="text-lg font-semibold text-gray-200 hover:text-cyan-400 transition-colors duration-200 pr-4">
+      <div className="flex justify-between items-start gap-3">
+        <a href={post.url} target="_blank" rel="noopener noreferrer" className="text-lg font-semibold text-gray-200 hover:text-cyan-400 transition-colors duration-200 flex-1">
           {post.title}
         </a>
-        <span className="bg-cyan-800/50 text-cyan-300 text-xs font-semibold px-2.5 py-1 rounded-full whitespace-nowrap">
-          {post.matchedKeyword}
-        </span>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <span className="bg-cyan-800/50 text-cyan-300 text-xs font-semibold px-2.5 py-1 rounded-full whitespace-nowrap">
+            {post.matchedKeyword}
+          </span>
+          {onDelete && (
+            <button
+              onClick={() => onDelete(post.id)}
+              className="text-gray-400 hover:text-red-400 transition-colors p-1 rounded hover:bg-gray-800"
+              title="Удалить"
+            >
+              <TrashIcon className="w-5 h-5" />
+            </button>
+          )}
+        </div>
       </div>
       <div className="mt-3 flex items-center justify-between text-sm text-gray-400">
         <div className="flex items-center space-x-4">

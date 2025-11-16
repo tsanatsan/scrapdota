@@ -19,6 +19,8 @@ const App: React.FC = () => {
   ]);
   const [isRunning, setIsRunning] = useState<boolean>(false);
   const [isConnected, setIsConnected] = useState<boolean>(false);
+  const [filterKeyword, setFilterKeyword] = useState<string>('all');
+  const [sortBy, setSortBy] = useState<'date' | 'keyword'>('date');
 
   const ws = useRef<WebSocket | null>(null);
 
@@ -39,6 +41,12 @@ const App: React.FC = () => {
             setKeywords(message.payload.keywords);
             setForums(message.payload.forums);
             setIsRunning(message.payload.isRunning);
+            if (message.payload.posts) {
+              setPosts(message.payload.posts.map((p: any) => ({
+                ...p,
+                timestamp: new Date(p.timestamp)
+              })));
+            }
             break;
           case 'STATE_UPDATE':
             setKeywords(message.payload.keywords);
@@ -51,6 +59,12 @@ const App: React.FC = () => {
               timestamp: new Date(message.payload.timestamp),
             };
             setPosts(prevPosts => [newPost, ...prevPosts.slice(0, 99)]);
+            break;
+          case 'POST_DELETED':
+            setPosts(prevPosts => prevPosts.filter(p => p.id !== message.payload.id));
+            break;
+          case 'POSTS_CLEARED':
+            setPosts([]);
             break;
         }
       };
@@ -109,6 +123,11 @@ const App: React.FC = () => {
   
   const clearPosts = () => {
     setPosts([]);
+    sendMessage('CLEAR_POSTS');
+  };
+  
+  const deletePost = (id: string) => {
+    sendMessage('DELETE_POST', { id });
   };
   
   const toggleRunning = () => {
@@ -142,7 +161,14 @@ const App: React.FC = () => {
             />
           </div>
           <div className="lg:col-span-2">
-            <ResultsFeed posts={posts} />
+            <ResultsFeed 
+              posts={posts}
+              filterKeyword={filterKeyword}
+              sortBy={sortBy}
+              onFilterChange={setFilterKeyword}
+              onSortChange={setSortBy}
+              onDeletePost={deletePost}
+            />
           </div>
         </div>
       </main>
