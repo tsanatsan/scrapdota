@@ -21,7 +21,7 @@ class ForumScraper {
   async initialize() {
     console.log('🚀 Инициализация браузера...');
     this.browser = await chromium.launch({
-      headless: false, // Отключаем headless для отладки
+      headless: true, // Включаем headless для продакшена
       args: ['--no-sandbox']
     });
     this.page = await this.browser.newPage();
@@ -61,10 +61,18 @@ class ForumScraper {
     
     console.log(`📊 Найдено топиков: ${topicLinks.length}\n`);
     
+    // Ограничиваем количество парсимых топиков (10 за раз)
+    const MAX_TOPICS_PER_RUN = 10;
+    const topicsToProcess = topicLinks.slice(0, MAX_TOPICS_PER_RUN);
+    
+    if (topicsToProcess.length < topicLinks.length) {
+      console.log(`⚠️ Ограничение: будет обработано ${MAX_TOPICS_PER_RUN} из ${topicLinks.length}\n`);
+    }
+    
     const topics: TopicData[] = [];
     
     // Переходим по каждому топику
-    for (const {title, url} of topicLinks) {
+    for (const {title, url} of topicsToProcess) {
       try {
         // Пропускаем уже обработанные
         if (this.scrapedTopics.has(url)) continue;
