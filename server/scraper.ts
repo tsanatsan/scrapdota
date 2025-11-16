@@ -122,9 +122,26 @@ class ForumScraper {
   
   private async parseTopicContent(): Promise<string> {
     try {
-      // Ищем содержимое топика (первый пост)
-      const contentElement = await this.page?.$('.message-body, .bbWrapper, article');
-      return await contentElement?.textContent() || '';
+      // Ищем содержимое ПЕРВОГО поста (описание топика автором)
+      // Пробуем разные селекторы для XenForo форумов
+      const selectors = [
+        '.message:first-of-type',  // Первое сообщение
+        'article:first-of-type',
+        '.post:first-of-type',
+        '[data-content="message-body"]',
+      ];
+      
+      for (const selector of selectors) {
+        const element = await this.page?.$(selector);
+        if (element) {
+          const text = await element.textContent();
+          if (text && text.trim().length > 0) {
+            return text.trim();
+          }
+        }
+      }
+      
+      return '';
     } catch {
       return '';
     }
