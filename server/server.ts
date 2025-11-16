@@ -15,13 +15,7 @@ const USE_MOCK_DATA = false; // Переключатель: true - мок-дан
 const SCRAPE_INTERVAL = 5 * 60 * 1000; // 5 минут
 
 // --- State Management ---
-let keywords: Keyword[] = [
-  { id: '1', text: 'продам' },
-  { id: '2', text: 'куплю' },
-  { id: '3', text: 'обмен' },
-  { id: '4', text: 'cache' },
-  { id: '5', text: 'arcana' },
-];
+let keywords: Keyword[] = []; // Пустой массив - пользователь добавит сам
 
 let forums: Forum[] = [
   { id: '1', url: 'https://dota2.ru/forum/forums/obmen-vnutriigrovymi-predmetami-dota-2.86/' },

@@ -8,19 +8,13 @@ const WEBSOCKET_URL = 'ws://localhost:8080';
 
 const App: React.FC = () => {
   const [posts, setPosts] = useState<Post[]>([]);
-  const [keywords, setKeywords] = useState<Keyword[]>([
-    { id: '1', text: 'продам' },
-    { id: '2', text: 'куплю' },
-    { id: '3', text: 'обмен' },
-    { id: '4', text: 'cache' },
-  ]);
+  const [keywords, setKeywords] = useState<Keyword[]>([]);
   const [forums, setForums] = useState<Forum[]>([
-    { id: '1', url: 'https://dota2.ru/forum/forums/obmen-predmetami-dota-2.910/' },
+    { id: '1', url: 'https://dota2.ru/forum/forums/obmen-vnutriigrovymi-predmetami-dota-2.86/' },
   ]);
   const [isRunning, setIsRunning] = useState<boolean>(false);
   const [isConnected, setIsConnected] = useState<boolean>(false);
   const [filterKeyword, setFilterKeyword] = useState<string>('all');
-  const [sortBy, setSortBy] = useState<'date' | 'keyword'>('date');
 
   const ws = useRef<WebSocket | null>(null);
 
@@ -169,9 +163,7 @@ const App: React.FC = () => {
             <ResultsFeed 
               posts={posts}
               filterKeyword={filterKeyword}
-              sortBy={sortBy}
               onFilterChange={setFilterKeyword}
-              onSortChange={setSortBy}
               onDeletePost={deletePost}
             />
           </div>
