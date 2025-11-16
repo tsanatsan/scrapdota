@@ -5,6 +5,7 @@ import { PlusIcon } from './icons/PlusIcon';
 import { TrashIcon } from './icons/TrashIcon';
 import { PlayIcon } from './icons/PlayIcon';
 import { PauseIcon } from './icons/PauseIcon';
+import { RefreshIcon } from './icons/RefreshIcon';
 
 interface SettingsPanelProps {
   keywords: Keyword[];
@@ -16,6 +17,7 @@ interface SettingsPanelProps {
   onAddForum: (url: string) => void;
   onRemoveForum: (id: string) => void;
   onClearPosts: () => void;
+  onRefreshNow: () => void;
 }
 
 export const SettingsPanel: React.FC<SettingsPanelProps> = ({
@@ -28,6 +30,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
   onAddForum,
   onRemoveForum,
   onClearPosts,
+  onRefreshNow,
 }) => {
   const [newKeyword, setNewKeyword] = useState('');
   const [newForum, setNewForum] = useState('');
@@ -48,19 +51,30 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
     <div className="bg-gray-800 rounded-lg shadow-lg p-6 space-y-8 sticky top-24">
       <div>
         <h2 className="text-xl font-semibold text-gray-200 mb-4">Управление</h2>
-        <div className="flex space-x-4">
+        <div className="flex flex-col space-y-3">
+          <div className="flex space-x-3">
+            <button
+              onClick={onToggleRunning}
+              className={`flex-1 flex items-center justify-center px-4 py-2 rounded-md font-semibold transition-colors duration-200 ${
+                isRunning
+                  ? 'bg-yellow-500 hover:bg-yellow-600 text-gray-900'
+                  : 'bg-green-500 hover:bg-green-600 text-white'
+              }`}
+            >
+              {isRunning ? <PauseIcon /> : <PlayIcon />}
+              <span className="ml-2">{isRunning ? 'Приостановить' : 'Запустить'}</span>
+            </button>
+            <button
+              onClick={onRefreshNow}
+              disabled={!isRunning}
+              className="flex-1 flex items-center justify-center px-4 py-2 rounded-md font-semibold transition-colors duration-200 bg-blue-600 hover:bg-blue-700 text-white disabled:bg-gray-600 disabled:cursor-not-allowed disabled:opacity-50"
+              title="Запустить парсинг сейчас"
+            >
+              <RefreshIcon />
+              <span className="ml-2">Обновить</span>
+            </button>
+          </div>
           <button
-            onClick={onToggleRunning}
-            className={`w-full flex items-center justify-center px-4 py-2 rounded-md font-semibold transition-colors duration-200 ${
-              isRunning
-                ? 'bg-yellow-500 hover:bg-yellow-600 text-gray-900'
-                : 'bg-green-500 hover:bg-green-600 text-white'
-            }`}
-          >
-            {isRunning ? <PauseIcon /> : <PlayIcon />}
-            <span className="ml-2">{isRunning ? 'Приостановить' : 'Запустить'}</span>
-          </button>
-           <button
             onClick={onClearPosts}
             className="w-full flex items-center justify-center px-4 py-2 rounded-md font-semibold transition-colors duration-200 bg-red-600 hover:bg-red-700 text-white"
           >

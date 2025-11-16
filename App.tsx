@@ -133,6 +133,10 @@ const App: React.FC = () => {
   const toggleRunning = () => {
     sendMessage(isRunning ? 'STOP_SCRAPING' : 'START_SCRAPING');
   };
+  
+  const refreshNow = () => {
+    sendMessage('REFRESH_NOW');
+  };
 
   return (
     <div className="min-h-screen bg-gray-900 font-sans">
@@ -158,6 +162,7 @@ const App: React.FC = () => {
               onAddForum={addForum}
               onRemoveForum={removeForum}
               onClearPosts={clearPosts}
+              onRefreshNow={refreshNow}
             />
           </div>
           <div className="lg:col-span-2">

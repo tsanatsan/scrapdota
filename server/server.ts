@@ -210,6 +210,13 @@ wss.on('connection', ws => {
         posts.length = 0;
         broadcast({ type: 'POSTS_CLEARED' });
         break;
+        
+      case 'REFRESH_NOW':
+        console.log('🔄 Запрос немедленного обновления...');
+        if (isRunning) {
+          scrapeForums();
+        }
+        break;
     }
   });
 
